@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LFJ Liquidity Book 區間流動性分析儀</title>
+    <!-- Tailwind CSS for layout structure -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#090b0e',
+                        darkCard: '#131722',
+                        accentBlue: '#2096f3',
+                        accentPurple: '#7048e8',
+                        textPrimary: '#f0f3f8',
+                        textSecondary: '#8a939f',
+                        borderColor: '#242a35'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts: Outfit & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for beautiful charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="bg-darkBg text-textPrimary font-outfit min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="border-b border-borderColor bg-darkCard/80 backdrop-blur-md sticky top-0 z-50 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-accentPurple to-accentBlue flex items-center justify-center shadow-lg shadow-accentPurple/20 animate-pulse-slow">
+                    <i class="fa-solid fa-layer-group text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-textPrimary to-accentBlue bg-clip-text text-transparent">
+                        LFJ Liquidity Book 區間流動性分析儀
+                    </h1>
+                    <p class="text-xs text-textSecondary">Trader Joe V2.1 每個 Bin 即時 Reserves 與深度查詢工具</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <span id="networkBadge" class="px-3 py-1 rounded-full text-xs font-medium bg-purple-500/10 border border-purple-500/30 text-purple-400 flex items-center gap-1.5">
+                    <span id="networkBadgeDot" class="w-2 h-2 rounded-full bg-purple-500 animate-ping"></span>
+                    <span id="networkBadgeText">Monad</span>
+                </span>
+                <a href="https://docs.lfj.gg/" target="_blank" class="text-xs text-textSecondary hover:text-accentBlue transition-colors flex items-center gap-1">
+                    <i class="fa-solid fa-book"></i> LFJ 文件
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl mx-auto w-full p-4 md:p-6 space-y-6">
+        <!-- Configuration & Input Section -->
+        <section class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <!-- Parameter Form -->
+            <div class="lg:col-span-3 card-gradient rounded-2xl border border-borderColor p-6 relative overflow-hidden group">
+                <div class="absolute -right-20 -top-20 w-40 h-40 bg-accentBlue/10 rounded-full blur-3xl group-hover:bg-accentBlue/15 transition-all duration-700"></div>
+                <div class="absolute -left-20 -bottom-20 w-40 h-40 bg-accentPurple/10 rounded-full blur-3xl group-hover:bg-accentPurple/15 transition-all duration-700"></div>
+                
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-accentBlue"></i> 參數設定
+                </h2>
+                
+                <form id="queryForm" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Pool Address Selection -->
+                        <div class="md:col-span-2">
+                            <label for="poolSelect" class="block text-xs font-medium text-textSecondary mb-1">
+                                LB Pair 合約地址 (Pool Address)
+                            </label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-textSecondary">
+                                    <i class="fa-solid fa-list-check text-sm"></i>
+                                </span>
+                                <select id="poolSelect" class="input-custom pl-10">
+                                    <option value="0x1fEf020CAf5129A81aAb604f7fD14Cb54BF18963" data-chain="Monad" data-rpc="https://rpc.monad.xyz" selected>Monad: AUSD / USDT0 (0x1fEf02...8963)</option>
+                                    <option value="0x3eE837305218d05C0C9dAa452A5f3C35091Dcd3e" data-chain="Monad" data-rpc="https://rpc.monad.xyz">Monad: USDT0 / USDC (0x3eE837...d3e)</option>
+                                    <option value="0xcec377285abf370fdf872625d2742252656d631a" data-chain="Avalanche" data-rpc="https://api.avax.network/ext/bc/C/rpc">Avalance: AUSD / USDT (0xcec377...631a)</option>
+                                    <option value="0x8573f98175d816d520248b5facf40d309b1c9cee" data-chain="Avalanche" data-rpc="https://api.avax.network/ext/bc/C/rpc">Avalance: USD / USDC (0x8573f9...9cee)</option>
+                                    <option value="0x2823299af89285ff1a1abf58db37ce57006fef5d" data-chain="Avalanche" data-rpc="https://api.avax.network/ext/bc/C/rpc">Avalance: USDt / USDC (0x282329...ef5d)</option>
+                                    <option value="custom">自訂合約地址 (Custom Pool Address)</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Custom Pool Address Input (Hidden by default) -->
+                            <div id="customPoolContainer" class="hidden mt-2 relative animate-fade-in">
+                                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-textSecondary">
+                                    <i class="fa-solid fa-hashtag text-sm"></i>
+                                </span>
+                                <input type="text" id="poolAddress" 
+                                       placeholder="請輸入自訂 LB Pair 合約地址" 
+                                       class="input-custom pl-10"
+                                       value="0x1fEf020CAf5129A81aAb604f7fD14Cb54BF18963">
+                            </div>
+                        </div>
+                        
+                        <!-- Min Price -->
+                        <div>
+                            <label for="minPrice" class="block text-xs font-medium text-textSecondary mb-1">
+                                價格區間下限 (Min Price)
+                            </label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-textSecondary">
+                                    <i class="fa-solid fa-arrow-down text-sm"></i>
+                                </span>
+                                <input type="number" id="minPrice" required step="any" min="0.0000000001"
+                                       placeholder="例如: 0.999" 
+                                       class="input-custom pl-10"
+                                       value="0.999">
+                            </div>
+                        </div>
+
+                        <!-- Max Price -->
+                        <div>
+                            <label for="maxPrice" class="block text-xs font-medium text-textSecondary mb-1">
+                                價格區間上限 (Max Price)
+                            </label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-textSecondary">
+                                    <i class="fa-solid fa-arrow-up text-sm"></i>
+                                </span>
+                                <input type="number" id="maxPrice" required step="any" min="0.0000000001"
+                                       placeholder="例如: 1.001" 
+                                       class="input-custom pl-10"
+                                       value="1.001">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Collapsible Advanced Settings -->
+                    <details class="group/adv border-t border-borderColor/50 pt-4">
+                        <summary class="text-xs text-textSecondary hover:text-textPrimary cursor-pointer list-none flex items-center justify-between font-medium">
+                            <span class="flex items-center gap-1.5">
+                                <i class="fa-solid fa-cog animate-rotate-hover"></i> 進階設定 (RPC 節點)
+                            </span>
+                            <i class="fa-solid fa-chevron-down group-open/adv:rotate-180 transition-transform"></i>
+                        </summary>
+                        <div class="mt-3">
+                            <label for="rpcUrl" id="rpcUrlLabel" class="block text-xs font-medium text-textSecondary mb-1">
+                                Monad RPC 節點 URL
+                            </label>
+                            <input type="text" id="rpcUrl" 
+                                   placeholder="https://rpc.monad.xyz" 
+                                   class="input-custom"
+                                   value="https://rpc.monad.xyz">
+                        </div>
+                    </details>
+
+                    <!-- Fetch Button -->
+                    <button type="submit" id="submitBtn" class="btn-primary w-full py-3 font-semibold text-sm flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-magnifying-glass"></i> 載入流動性與 Reserves 數據
+                    </button>
+                </form>
+            </div>
+
+            <!-- Shortcuts & Info Card -->
+            <div class="card-gradient rounded-2xl border border-borderColor p-6 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-md font-semibold mb-3 text-textPrimary flex items-center gap-2">
+                        <i class="fa-solid fa-circle-info text-accentPurple"></i> 使用說明
+                    </h3>
+                    <ul class="text-xs text-textSecondary space-y-2.5 list-disc list-inside">
+                        <li>輸入 Avalanche C-Chain 或 Monad 上的 LFJ 交易對池地址。</li>
+                        <li>設定感興趣的價格範圍（例如 0.999 至 1.001）。</li>
+                        <li>系統將自動計算對應的 Bin ID 並透過 Multicall3 發起非同步批量讀取。</li>
+                        <li><b>請注意：</b>為避免 RPC 節點超載或逾時，查詢的 Bin 數量上限為 2,000 個。</li>
+                    </ul>
+                </div>
+                
+                <!-- Quick Address Templates -->
+                <div class="mt-4 pt-4 border-t border-borderColor/50">
+                    <h4 class="text-xs font-semibold text-textPrimary mb-2">常用 Pool 範例地址:</h4>
+                    <div class="space-y-2">
+                        <button type="button" class="quick-link-btn" 
+                                onclick="fillExample('0x1fEf020CAf5129A81aAb604f7fD14Cb54BF18963', 0.999, 1.001, 'Monad', 'https://rpc.monad.xyz')">
+                            <span>Monad: AUSD / USDT0 (binStep: 1)</span>
+                            <i class="fa-solid fa-copy text-[10px]"></i>
+                        </button>
+                        <button type="button" class="quick-link-btn" 
+                                onclick="fillExample('0xcec377285abf370fdf872625d2742252656d631a', 0.999, 1.001, 'Avalanche', 'https://api.avax.network/ext/bc/C/rpc')">
+                            <span>Avalance: AUSD / USDT (binStep: 1)</span>
+                            <i class="fa-solid fa-copy text-[10px]"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Loading / Status Panel -->
+        <section id="loadingPanel" class="hidden">
+            <div class="card-gradient rounded-2xl border border-borderColor p-8 flex flex-col items-center justify-center space-y-4">
+                <div class="relative w-16 h-16">
+                    <div class="absolute inset-0 rounded-full border-4 border-accentBlue/20"></div>
+                    <div class="absolute inset-0 rounded-full border-4 border-t-accentBlue animate-spin"></div>
+                </div>
+                <div class="text-center">
+                    <p id="loadingText" class="font-semibold text-md text-textPrimary">正在從區塊鏈節點獲取數據...</p>
+                    <p class="text-xs text-textSecondary mt-1">此步驟正在批次查詢合約，可能需要數秒時間</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Error Panel -->
+        <section id="errorPanel" class="hidden">
+            <div class="bg-red-500/10 border border-red-500/30 rounded-2xl p-5 flex items-start gap-4">
+                <div class="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center text-red-400 flex-shrink-0">
+                    <i class="fa-solid fa-triangle-exclamation text-lg"></i>
+                </div>
+                <div class="flex-grow">
+                    <h3 class="font-semibold text-red-400">獲取數據失敗</h3>
+                    <p id="errorMessage" class="text-xs text-textSecondary mt-1">無法連接到合約，請確認地址與網路設定。</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results Dashboard (Hidden initially) -->
+        <section id="resultsSection" class="hidden space-y-6">
+            <!-- Pool Metadata Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Pair Card -->
+                <div class="card-gradient rounded-2xl border border-borderColor p-5 flex items-center justify-between">
+                    <div class="space-y-1">
+                        <span class="text-xs text-textSecondary">交易對代幣</span>
+                        <h4 id="pairSymbols" class="text-lg font-bold">WAVAX / USDC</h4>
+                        <div class="text-xs text-textSecondary flex items-center gap-1.5">
+                            <span id="tokenXSymbol" class="font-semibold">WAVAX</span>
+                            <span class="text-[9px] px-1.5 py-0.5 rounded bg-borderColor">X</span>
+                            <span>/</span>
+                            <span id="tokenYSymbol" class="font-semibold">USDC</span>
+                            <span class="text-[9px] px-1.5 py-0.5 rounded bg-borderColor">Y</span>
+                        </div>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-accentBlue/10 flex items-center justify-center text-accentBlue">
+                        <i class="fa-solid fa-shuffle text-xl"></i>
+                    </div>
+                </div>
+
+                <!-- Price/Bin Card -->
+                <div class="card-gradient rounded-2xl border border-borderColor p-5 flex items-center justify-between">
+                    <div class="space-y-1">
+                        <span class="text-xs text-textSecondary">目前市場價格</span>
+                        <h4 id="activePriceVal" class="text-lg font-bold font-mono">22.45</h4>
+                        <span class="text-xs text-textSecondary">
+                            Active Bin ID: <strong id="activeBinId" class="font-mono text-textPrimary">8377221</strong>
+                        </span>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-accentPurple/10 flex items-center justify-center text-accentPurple">
+                        <i class="fa-solid fa-chart-line text-xl"></i>
+                    </div>
+                </div>
+
+                <!-- binStep Card -->
+                <div class="card-gradient rounded-2xl border border-borderColor p-5 flex items-center justify-between">
+                    <div class="space-y-1">
+                        <span class="text-xs text-textSecondary">Bin Step (間距)</span>
+                        <h4 id="binStepVal" class="text-lg font-bold font-mono">20</h4>
+                        <span id="binStepPct" class="text-xs text-textSecondary">
+                            即每 Bin 價格差 0.20%
+                        </span>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-yellow-500/10 flex items-center justify-center text-yellow-500">
+                        <i class="fa-solid fa-arrows-left-right text-xl"></i>
+                    </div>
+                </div>
+
+                <!-- Query Details Card -->
+                <div class="card-gradient rounded-2xl border border-borderColor p-5 flex items-center justify-between">
+                    <div class="space-y-1">
+                        <span class="text-xs text-textSecondary">查詢區間 Bin 總數</span>
+                        <h4 id="queryBinCount" class="text-lg font-bold font-mono">152</h4>
+                        <span class="text-xs text-textSecondary">
+                            Bin ID: <span id="binIdRange" class="font-mono text-textPrimary text-[11px]">8377100 - 8377252</span>
+                        </span>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500">
+                        <i class="fa-solid fa-calculator text-xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reserves Overview Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Reserve X -->
+                <div class="card-gradient rounded-2xl border border-borderColor p-6 relative overflow-hidden group">
+                    <div class="absolute -right-16 -top-16 w-32 h-32 bg-accentBlue/5 rounded-full blur-2xl group-hover:bg-accentBlue/10 transition-all"></div>
+                    <span class="text-xs font-semibold text-accentBlue tracking-wider uppercase">Token X 區間總等待交易量</span>
+                    <div class="mt-3 flex items-baseline gap-2">
+                        <span id="totalReserveXVal" class="text-3xl font-extrabold font-mono tracking-tight text-white">0.00</span>
+                        <span id="totalReserveXSymbol" class="text-md text-textSecondary font-semibold">WAVAX</span>
+                    </div>
+                    <p id="tokenXDetails" class="text-xs text-textSecondary mt-2">名稱: WAVAX (18 Decimals)</p>
+                </div>
+
+                <!-- Reserve Y -->
+                <div class="card-gradient rounded-2xl border border-borderColor p-6 relative overflow-hidden group">
+                    <div class="absolute -right-16 -top-16 w-32 h-32 bg-accentPurple/5 rounded-full blur-2xl group-hover:bg-accentPurple/10 transition-all"></div>
+                    <span class="text-xs font-semibold text-accentPurple tracking-wider uppercase">Token Y 區間總等待交易量</span>
+                    <div class="mt-3 flex items-baseline gap-2">
+                        <span id="totalReserveYVal" class="text-3xl font-extrabold font-mono tracking-tight text-white">0.00</span>
+                        <span id="totalReserveYSymbol" class="text-md text-textSecondary font-semibold">USDC</span>
+                    </div>
+                    <p id="tokenYDetails" class="text-xs text-textSecondary mt-2">名稱: USD Coin (6 Decimals)</p>
+                </div>
+            </div>
+
+            <!-- Liquidity Depth Chart Card -->
+            <div class="card-gradient rounded-2xl border border-borderColor p-6">
+                <h3 class="text-md font-semibold mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-bar text-accentBlue"></i> 區間流動性深度分佈圖 (Reserves Distribution)
+                </h3>
+                <div class="chart-container relative h-[380px] w-full">
+                    <canvas id="depthChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Bins Details Table -->
+            <div class="card-gradient rounded-2xl border border-borderColor overflow-hidden">
+                <div class="p-6 border-b border-borderColor flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <h3 class="text-md font-semibold flex items-center gap-2">
+                        <i class="fa-solid fa-list-ol text-accentPurple"></i> 價格區間明細 (Bin Details)
+                    </h3>
+                    <div class="flex items-center gap-4">
+                        <label class="flex items-center gap-2 text-xs text-textSecondary cursor-pointer">
+                            <input type="checkbox" id="hideEmptyBins" class="rounded bg-darkBg border-borderColor text-accentBlue focus:ring-0 w-4 h-4 cursor-pointer" checked>
+                            <span>隱藏無流動性 (0 Reserves) 的 Bins</span>
+                        </label>
+                        <span class="text-xs text-textSecondary bg-darkBg px-3 py-1.5 rounded border border-borderColor/60">
+                            顯示筆數: <strong id="tableRowCount" class="text-textPrimary font-mono">0</strong>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto max-h-[500px] overflow-y-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-darkBg/60 text-xs font-semibold text-textSecondary uppercase border-b border-borderColor">
+                                <th class="py-3.5 px-6 font-mono">Bin ID</th>
+                                <th class="py-3.5 px-6">價格 (Y/X)</th>
+                                <th class="py-3.5 px-6 text-right" id="tableThX">Token X Reserves</th>
+                                <th class="py-3.5 px-6 text-right" id="tableThY">Token Y Reserves</th>
+                                <th class="py-3.5 px-6 text-right" id="tableThVal">總價值 (Y)</th>
+                                <th class="py-3.5 px-6 text-center">狀態</th>
+                            </tr>
+                        </thead>
+                        <tbody id="binsTableBody" class="divide-y divide-borderColor/40 text-sm font-medium">
+                            <!-- Filled dynamically by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-borderColor bg-darkCard/30 py-6 px-6 mt-10">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between text-xs text-textSecondary gap-4">
+            <div>
+                &copy; 2026 LFJ Liquidity Book Explorer. Built using Web3.py & FastAPI.
+            </div>
+            <div class="flex items-center gap-4">
+                <span>Avalanche C-Chain Network: Active</span>
+                <span>•</span>
+                <span class="text-accentBlue flex items-center gap-1">
+                    <i class="fa-solid fa-bolt"></i> 即時 RPC 連線
+                </span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Frontend logic script -->
+    <script src="/static/app.js"></script>
+</body>
+</html>

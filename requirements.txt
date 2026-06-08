@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+web3>=6.12
+eth-abi>=5.0
+pandas>=2.2
+altair>=5.2
